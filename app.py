@@ -1,6 +1,9 @@
 from tasks import flask_app, long_running_task, update_pinecone_index
 from celery.result import AsyncResult  # -Line 2
 from flask import request, jsonify
+from flask_cors import CORS
+
+CORS(flask_app)
 
 
 @flask_app.post("/trigger_task")
