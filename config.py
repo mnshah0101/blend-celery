@@ -2,7 +2,7 @@ from celery import Celery, Task
 from flask import Flask
 import os
 
-redis_url = os.getenv("REDIS_URL")
+redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 
 def celery_init_app(app: Flask) -> Celery:

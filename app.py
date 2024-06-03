@@ -11,31 +11,39 @@ def start_task() -> dict[str, object]:
     return {"result_id": result.id}
 
 
-@flask_app.get("/get_result")
-def task_result() -> dict[str, object]:
-    result_id = request.args.get('result_id')
-    result = AsyncResult(result_id)  # -Line 4
-    if result.ready():  # -Line 5
-        # Task has completed
-        if result.successful():  # -Line 6
+@flask_app.route('/taskStatus', methods=['GET'])
+def get_task_status():
 
-            return {
-                "ready": result.ready(),
-                "successful": result.successful(),
-                "value": result.result,  # -Line 7
-            }
-        else:
-            # Task completed with an error
-            return jsonify({'status': 'ERROR', 'error_message': str(result.result)})
+    task_id = request.args.get('task_id')
+
+    task = update_pinecone_index.AsyncResult(task_id)
+    if task.state == 'PENDING':
+        response = {
+            "state": task.state,
+            "status": "Pending..."
+        }
+    elif task.state != 'FAILURE':
+        response = {
+            "state": task.state,
+            "status": task.info.get('status', ''),
+            "result": task.info
+        }
     else:
-        # Task is still pending
-        return jsonify({'status': 'Running'})
+        response = {
+            "state": task.state,
+            "status": str(task.info)  # this is the exception raised
+        }
+    return jsonify(response)
 
 
 @flask_app.get("/update_pinecone_index")
-def handleUpdate():
-    update_pinecone_index.delay()
-    return "Pinecone index update triggered"
+def handle_update():
+    try:
+        task = update_pinecone_index.apply_async()
+        return jsonify({"status": "success", "result_id": task.id}), 202
+    except Exception as e:
+        print(e)
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 if __name__ == "__main__":
