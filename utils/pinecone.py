@@ -373,10 +373,16 @@ def getDocumentIdByUrl(file_url):
 def handleUpdate():
     try:
         s3_urls, ids, file_names = getProcessingDocs()
-        response = upload_documents(s3_urls, ids, file_names)
-        if (response['status'] == 'error'):
-            return {"status": 500, "message": response['message']}
-        return {"status": 200, "data": response['message']}
+
+        for i in range(len(ids)):
+            response = upload_documents(
+                [s3_urls[i]], [ids[i]], [file_names[i]])
+            if response['status'] == 'uploaded':
+                print("Document uploaded successfully")
+            else:
+                print("Error uploading document")
+
+        return {"status": 200, "data": "Documents uploaded"}
     except Exception as e:
         print(e)
         return {"status": 500, "message": str(e)}

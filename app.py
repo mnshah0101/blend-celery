@@ -6,16 +6,9 @@ from flask_cors import CORS
 CORS(flask_app)
 
 
-@flask_app.post("/trigger_task")
-def start_task() -> dict[str, object]:
-    iterations = request.args.get('iterations')
-    print(iterations)
-    result = long_running_task.delay(int(iterations))  # -Line 3
-    return {"result_id": result.id}
-
-
-@flask_app.route('/taskStatus', methods=['GET'])
+@flask_app.get('/taskStatus')
 def get_task_status():
+    print("getting task status")
 
     task_id = request.args.get('task_id')
 
