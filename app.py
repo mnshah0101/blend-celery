@@ -1,46 +1,67 @@
-from tasks import flask_app, long_running_task, update_pinecone_index
-from celery.result import AsyncResult  # -Line 2
+from tasks import process_campaign_task, process_video_task
+from celery.result import AsyncResult 
 from flask import request, jsonify
 from flask_cors import CORS
 
+from flask import Flask
+
+flask_app = Flask(__name__)
+
+
+
 CORS(flask_app)
 
+@flask_app.route('/process_campaign', methods=['POST'])
+def process_campaign():
 
-@flask_app.get('/taskStatus')
-def get_task_status():
-    print("getting task status")
+    if 'campaign_id' not in request.json:
+        return jsonify({'error': 'campaign_id is required'}), 400
 
-    task_id = request.args.get('task_id')
 
-    task = update_pinecone_index.AsyncResult(task_id)
-    if task.state == 'PENDING':
-        response = {
-            "state": task.state,
-            "status": "Pending..."
-        }
-    elif task.state != 'FAILURE':
-        response = {
-            "state": task.state,
-            "status": task.info.get('status', ''),
-            "result": task.info
-        }
+    campaign_id = request.json['campaign_id']
+    if not campaign_id:
+        return jsonify({'error': 'campaign_id is required'}), 400
+
+
+    task = process_campaign_task.delay(campaign_id)
+    return jsonify({'task_id': task.id})
+
+@flask_app.route('/process_video', methods=['POST'])
+def process_video():
+    if 'video_id' not in request.json:
+        return jsonify({'error': 'video_id is required'}), 400
+    video_id = request.json['video_id']
+
+    if not video_id:
+        return jsonify({'error': 'video_id is required'}), 400
+
+    task = process_video_task.delay(video_id)
+    return jsonify({'task_id': task.id})
+
+#endpoint to get the status of a task
+
+
+@flask_app.get("/task_status")
+def task_result() -> dict[str, object]:
+    result_id = request.args.get('task_id')
+    result = AsyncResult(result_id)  # -Line 4
+    if result.ready():  # -Line 5
+        # Task has completed
+        if result.successful():  # -Line 6
+
+            return {
+                "ready": result.ready(),
+                "successful": result.successful(),
+                "value": result.result,  # -Line 7
+            }
+        else:
+            # Task completed with an error
+            return jsonify({'status': 'ERROR', 'error_message': str(result.result)})
     else:
-        response = {
-            "state": task.state,
-            "status": str(task.info)  # this is the exception raised
-        }
-    return jsonify(response)
+        # Task is still pending
+        return jsonify({'status': 'Running'})
 
-
-@flask_app.get("/update_pinecone_index")
-def handle_update():
-    try:
-        task = update_pinecone_index.apply_async()
-        return jsonify({"status": "success", "result_id": task.id}), 202
-    except Exception as e:
-        print(e)
-        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 if __name__ == "__main__":
-    flask_app.run(port=5000, debug=True)
+    flask_app.run(port=3001, debug=True)
